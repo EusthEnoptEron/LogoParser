@@ -20,6 +20,25 @@ public class Logo {
   static private File javaFile, htmlFile;   // output files
   static private PrintWriter pw;            // printwriter used for every output
   static private int numIndent = 0;         // size of indentation
+  static private int varCounter = 0;
+  static private HashMap<String, String> variables = new HashMap();
+  static private Stack<String> repcounts = new Stack();
+
+
+  public static String getIdentifier(String name) {
+    if(variables.containsKey(name)) return variables.get(name);
+    else {
+        String variable = getIdentifier();
+        variables.put(name, variable);
+        return variable;
+    }
+  }
+
+
+
+  public static String getIdentifier() {
+    return "i" + (varCounter++);
+  }
 
   // to pretty-print the translation
   // uses numIndent and pw defined as static variables in LogoParser
@@ -135,61 +154,288 @@ void start() throws IOException:
 }
 
 void subroutine():
-{}
 {
-    <SUBROUTINE> <IDENTIFIER> ( <PARAMETER> )* ( statement() )* <END>
+    Token t;
+    int paramCount = 0;
+}
+{
+    <SUBROUTINE> t=<IDENTIFIER> {
+        indent();
+        pw.print("void " + getIdentifier(t.image) + "(");
+    }
+    (
+        t=<PARAMETER>{
+            if(paramCount++ > 0)
+                pw.print(", ");
+            pw.print("double " + getIdentifier(t.image.substring(1)) );
+        }
+    )*
+    {
+        numIndent++;
+        pw.println(") {");
+    }
+    (statement() )*
+    {
+        numIndent--;
+        indent();
+        pw.println("}");
+    }<END>
 }
 
 void statement():
 {}
 {
-  <CLEARSCREEN> |
-  <PENDOWN>     | <PENUP>      |
-  <HIDETURTLE>  | <SHOWTURTLE> |
-  (<FORWARD>|<BACKWARD>|<LEFTTURN>|<RIGHTTURN>|<WAIT>) nexpr() |
-  <REPEAT> nexpr() <LBRA> ( statement() )* <RBRA>  |
-  <IF> bexpr() <LBRA> ( statement() )* <RBRA> |
-  <IFELSE> bexpr() <LBRA> ( statement() )* <RBRA> <LBRA> ( statement() )* <RBRA> |
-  <IDENTIFIER> ( nexpr() )*
+  simpleFunction() |
+  parameterizedFunction() |
+  waitFn() |
+  userRoutine() |
+  repeat() |
+  ifonlyOp() |
+  ifelseOp()
 }
 
-
-void nexpr():
-{}
+void ifonlyOp():
 {
-    nterm() ( (<ADD>|<SUB>) nterm() )*
 }
-
-void nterm():
-{}
 {
-    nfactor() ( (<MUL>|<DIV>) nfactor()  )*
+    <IF> ifOp()
 }
 
-void nfactor():
-{}
+void ifelseOp():
+{
+}
+{
+    <IFELSE> ifOp()
+    {
+        indent(); numIndent++;
+        pw.println("else {");
+    }
+    <LBRA> ( statement() )* <RBRA>
+    {
+        numIndent--; indent();
+        pw.println("}");
+    }
+}
+
+void ifOp():
+{
+    String condition;
+}
+{
+  condition=bexpr()
+  {
+    indent(); numIndent++;
+    pw.printf("if (%s) {\n", condition );
+  }
+  <LBRA> ( statement() )* <RBRA>
+  {
+    numIndent--; indent();
+    pw.println("}");
+  }
+}
+
+void repeat():
+{
+    String e;
+}
+{
+    <REPEAT> e=nexpr()
+    {
+        String i = getIdentifier();
+        repcounts.push(i);
+        indent(); numIndent++;
+        pw.printf("for (int %s = 0; %1$s < (int)(%s); %1$s++){\n", i, e);
+    }
+    <LBRA> ( statement() )* <RBRA>
+    {
+        repcounts.pop();
+        numIndent--; indent();
+        pw.println("}");
+    }
+}
+
+void simpleFunction():
+{
+    Token t;
+}
+{
+    (t=<CLEARSCREEN>| t=<PENDOWN>| t=<PENUP>|t=<HIDETURTLE>|t=<SHOWTURTLE>)
+    {
+        indent();
+        pw.printf("logo.%s();\n", t.image.toLowerCase());
+    }
+}
+
+void parameterizedFunction():
+{
+    Token t;
+    String p;
+}
+{
+    (t=<FORWARD>|t=<BACKWARD>|t=<LEFTTURN>|t=<RIGHTTURN>) p=nexpr()
+    {
+        indent();
+        pw.printf("logo.%s(%s);\n", t.image.toLowerCase(), p);
+    }
+}
+
+void waitFn():
+{
+    Token t;
+    String p;
+}
+{
+ t=<WAIT> p=nexpr()
+    {
+        indent();
+        pw.printf("logo.%s((int)(%s));\n", t.image.toLowerCase(), p);
+    }
+}
+
+void userRoutine():
+{
+    Token t;
+    String param;
+  int paramCount = 0;
+}
+{
+    t=<IDENTIFIER>
+    {
+        indent();
+        pw.printf("this.%s(", getIdentifier(t.image));
+    }
+    (
+        param=nexpr()
+        {
+            if(paramCount++ > 0)
+                pw.print(", ");
+            pw.print( param );
+        }
+    )*
+    {
+        pw.println(");");
+    }
+}
+
+
+String nexpr():
+{
+    String expression;
+    String t2;
+    Token op;
+}
+{
+    expression = nterm()
+    {
+        expression = "(" + expression + ")";
+    }
+    (
+        (op=<ADD>|op=<SUB>) t2 = nterm()
+        {
+            expression += op.image + "(" + t2 + ")";
+        }
+    )*
+    {
+        return expression;
+    }
+}
+
+String nterm():
+{
+    String expression = "";
+    String factor;
+    Token t;
+}
+{
+    expression = nfactor()
+    {
+        expression = "(" + expression + ")";
+    }
+    (
+        (t=<MUL>|t=<DIV>) factor=nfactor()
+        {
+            expression += t.image + "(" + factor + ")";
+        }
+    )*
+    {
+        return expression;
+    }
+}
+
+String nfactor():
+{
+    Token t = null;
+    String expr = "";
+}
 {
     // Not implementable because of cases like "MYROUTINE 1 -1"
     //(<SUB>)?
-    (<NUM> | <REPCOUNT> | <PARAMETER> | <LPAR> nexpr() <RPAR>)
+    (t=<NUM> | <REPCOUNT> { expr = repcounts.peek(); } | t=<PARAMETER> { expr = getIdentifier(t.image.substring(1)); t = null; }| <LPAR> expr=nexpr() <RPAR>)
+    {
+        if(t != null)
+            return t.image;
+        else
+            return "(" + expr + ")";
+    }
 }
 
-void bexpr():
-{}
+String bexpr():
 {
-    bterm() ( <OR> bterm() )*
+    String l, r;
+}
+{
+    l = bterm()
+    {
+        l = "(" + l + ")";
+    }
+    (
+        <OR> r = bterm()
+        {
+            l += " || (" +r+")";
+        }
+    )*
+    {
+        return l;
+    }
 }
 
-void bterm():
-{}
+String bterm():
 {
-    bfactor() ( <AND> bfactor() )*
+    String l, r;
+}
+{
+    l = bfactor()
+    {
+        l = "("+l+")";
+    }
+    (
+        <AND> r = bfactor()
+        {
+            l += " && ("+r+")";
+        }
+    )*
+    {
+        return l;
+    }
 }
 
-void bfactor():
-{}
+String bfactor():
 {
-    <TRUE> | <FALSE> | <NOT> <LPAR> bexpr() <RPAR> | nexpr() ( <EQ> | <NE> | <LT> | <GT> | <LE> | <GE> ) nexpr()
+    Token t;
+    String result;
+    String n1, n2;
+}
+{
+    <TRUE> { return "true"; } |
+    <FALSE> { return "false"; } |
+    <NOT> <LPAR> result = bexpr() <RPAR>
+    {
+       return "!" + result;
+    }|
+    n1 = nexpr() ( t=<EQ> | t=<NE> | t=<LT> | t=<GT> | t=<LE> | t=<GE> ) n2 = nexpr()
+    {
+        return n1 + t.image + n2;
+    }
 }
 
 
