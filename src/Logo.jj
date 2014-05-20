@@ -34,6 +34,10 @@ public class Logo {
     }
   }
 
+  public static void removeIdentifier(String name) {
+    variables.remove(name);
+  }
+
 
   public static String getFunctionIdentifier(String name) {
     return getIdentifier("f_" + name);
@@ -168,13 +172,13 @@ void subroutine():
 {
     <SUBROUTINE> t=<IDENTIFIER> {
         indent();
-        pw.print("void " + getFunctionIdentifier(t.image) + "(");
+        pw.print("void " + getIdentifier(t.image) + "(");
     }
     (
         t=<PARAMETER>{
             if(paramCount++ > 0)
                 pw.print(", ");
-            pw.print("double " + getParamIdentifier(t.image.substring(1)) );
+            pw.print("double " + getIdentifier(t.image) );
         }
     )*
     {
@@ -309,7 +313,7 @@ void userRoutine():
     t=<IDENTIFIER>
     {
         indent();
-        pw.printf("this.%s(", getFunctionIdentifier(t.image));
+        pw.printf("this.%s(", getIdentifier(t.image));
     }
     (
         param=nexpr()
@@ -377,7 +381,7 @@ String nfactor():
 {
     // Not implementable because of cases like "MYROUTINE 1 -1"
     //(<SUB>)?
-    (t=<NUM> | <REPCOUNT> { expr = repcounts.peek(); } | t=<PARAMETER> { expr = getParamIdentifier(t.image.substring(1)); t = null; }| <LPAR> expr=nexpr() <RPAR>)
+    (t=<NUM> | <REPCOUNT> { expr = repcounts.peek(); } | t=<PARAMETER> { expr = getIdentifier(t.image); t = null; }| <LPAR> expr=nexpr() <RPAR>)
     {
         if(t != null)
             return t.image;

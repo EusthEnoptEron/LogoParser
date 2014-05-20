@@ -1,0 +1,23 @@
+LOGO TEST
+  TO LINES1 :SPACE :COUNT
+	REPEAT :COUNT [
+	  FD 600
+	  PU
+	  BK 600
+
+	  # Go to next line
+      RT 90
+      FD :SPACE
+      LT 90
+      PD
+	]
+  END
+
+
+  TO LINES2 :SPACE :COUNT
+	LINES1 :SPACE :COUNT
+  END
+
+  LINES1 20 20
+  #LINES2 10 20
+END
