@@ -4,7 +4,6 @@ LogoParser
 ## Note to myself
 
 
-- Variable names and function names must not overlap.
 - PROC -1 - 1 - 1
    1. Define special tokens for -1 etc. (no whitespace)
    2. Temporarily disable skipping whitespaces
