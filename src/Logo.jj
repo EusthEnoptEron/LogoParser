@@ -87,7 +87,7 @@ TOKEN: { <LBRA: "[">  | <RBRA: "]"> }
 TOKEN: { <EQ: "==">   | <NE: "!=">  }
 TOKEN: { <LT: "<">    | <GT: ">">   | <LE: "<="> | <GE: ">="> }
 TOKEN: { <AND: "AND"> | <OR: "OR"> }
-TOKEN: { <COMMENT:  "#" (~["\n"])*> }
+TOKEN: { <COMMENT:  "#" (~["\n","\r"])* ("\n" | "\r" | "\r\n")> }
 TOKEN: { <TRUE: "TRUE"> | <FALSE: "FALSE"> | <NOT: "NOT"> }
 // REPCOUNT is a pre-defined identifier rather than a keyword
 TOKEN: { <REPCOUNT: "REPCOUNT"> }
