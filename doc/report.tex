@@ -99,11 +99,12 @@
 %----------------------------------------------------------------------------------------
 
 \newcommand{\hmwkTitle}{Logo Parser} % Assignment title
-\newcommand{\hmwkDueDate}{Monday,\ January\ 1,\ 2012} % Due date
+\newcommand{\hmwkDueDate}{Friday,\ June\ 13,\ 2014} % Due date
 \newcommand{\hmwkClass}{AFL\ 101} % Course/class
 \newcommand{\hmwkClassTime}{} % Class/lecture time
 \newcommand{\hmwkClassInstructor}{} % Teacher/lecturer
-\newcommand{\hmwkAuthorName}{Simon Meer} % Your name
+\newcommand{\hmwkAuthorName}{Simon Meer (meers1)} % Your name
+\newcommand{\hmwkEmail}{simon.meer@bluewin.ch}
 
 %----------------------------------------------------------------------------------------
 %	TITLE PAGE
@@ -112,12 +113,14 @@
 \title{
 \vspace{2in}
 \textmd{\textbf{\hmwkClass:\ \hmwkTitle}}\\
-\normalsize\vspace{0.1in}\small{Due\ on\ \hmwkDueDate}\\
+\normalsize\vspace{0.1in}\small{\hmwkDueDate}\\
 \vspace{0.1in}\large{\textit{\hmwkClassInstructor\ \hmwkClassTime}}
 \vspace{3in}
 }
 
-\author{\textbf{\hmwkAuthorName}}
+\author{\textbf{\hmwkAuthorName} \\
+	\hmwkEmail
+}
 \date{} % Insert date here if you want it to appear below your name
 
 %----------------------------------------------------------------------------------------
@@ -144,7 +147,7 @@
 
 \begin{homeworkProblem}[Introduction]
 
-The problem at hand was to create a parser using JavaCC that recognizes the Logo language and is able to convert its code into compilable Java code.
+The problem at hand was to create a parser using JavaCC that recognizes the Logo language and is able to convert its code into compilable Java code. The primitives required for the presentation of the results were already provided. 
 
 \vspace{10pt} % Question
 
@@ -155,7 +158,8 @@ The problem at hand was to create a parser using JavaCC that recognizes the Logo
 %----------------------------------------------------------------------------------------
 
 \begin{homeworkProblem}[Grammar] % Custom section title
-No significant changes were made to the grammar, except for a few instances where inline rules were placed in external rules for easier reading.
+No significant changes were made to the grammar, except for a few instances where inline rules were placed in external rules for easier reading because of convoluted code. These changes are \textit{insignificant} and were therefore not included in the listing below.
+
 \begin{lstlisting}
 Program    = "LOGO" Identifier { Subroutine } { Statement } "END"
 
@@ -274,7 +278,7 @@ An additional regular expression was added to the \texttt{SKIP} list that goes l
 \end{homeworkSection}
 \end{homeworkProblem}
 \begin{homeworkProblem}[Tests]
-The solution has been tested by successfully parsing all logo files provided, as well as the following demo program, which is supposed to try as many corner cases as possible:
+The solution has been successfully tested by parsing all logo files provided as well as the following demo program, which is supposed to test as many corner cases as possible:
 
 
 \end{homeworkProblem}
@@ -294,9 +298,9 @@ LOGO PROBLEM
 END
 \end{lstlisting}
 
-The first one should normally be parsed as \texttt{MYROUTINE(1, -1)} but because of the way JavaCC works it will ignore all white spaces and therefore see those three calls as identical.
+Intuitively, the first function call should translate to \texttt{MYROUTINE(1, -1)} but because of the way JavaCC works, all white spaces (\texttt{SKIP} tokens) are ignored and the calls will be considered identical, i.e. as \texttt{MYROUTINE(1-1)}.
 
-Furthermore, the parser will do no sanity checks. I.e. if the Logo code makes no sense, then it will not run properly or not even compile.
+Furthermore, the parser will do no sanity checks. That means that if the Logo code makes no sense, then it will not run properly or not even compile.
 \end{homeworkProblem}
 %----------------------------------------------------------------------------------------
 
