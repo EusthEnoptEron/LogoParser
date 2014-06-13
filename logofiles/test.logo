@@ -1,23 +1,66 @@
 LOGO TEST
   TO LINES1 :SPACE :COUNT
-	REPEAT :COUNT [
-	  FD 600
-	  PU
-	  BK 600
+    REPEAT :COUNT [
+      FD 600
+      PU
+      BK 600
 
-	  # Go to next line
+      # Go to next line
       RT 90
       FD :SPACE
       LT 90
       PD
-	]
+    ]
   END
 
-
-  TO LINES2 :SPACE :COUNT
-	LINES1 :SPACE :COUNT
+  TO DO :DO
+    FD :DO
   END
 
+  TO MIKEKOSS
+    FD 100
+    BK 50
+    RT 90
+    FD 50
+    LT 90
+    FD 50
+    BK 100
+    PU
+    RT 90
+    FD 25
+    LT 90
+    PD
+    FD 50
+    PU
+    FD 10
+    PD
+    FD 5
+    HT
+  END
+
+  TO TEST
+    CS
+    PD
+    PU
+    HT
+    ST
+    FD 1
+    BK 1
+    LT 1
+    RT 1
+    WAIT 1
+    REPEAT 2 [
+      IFELSE REPCOUNT == 0 [
+        DO -1
+      ] [
+        DO 1
+        DO 1
+      ]
+    ]
+  END
+
+  MIKEKOSS
+  TEST
+  DO 20
   LINES1 20 20
-  #LINES2 10 20
 END

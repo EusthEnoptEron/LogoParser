@@ -1,5 +1,4 @@
-// $Author: beo1 $
-// $Id: Logo.jj 1354 2012-12-05 14:28:28Z beo1 $
+// $Author: meers1 $
 //
 // Parser and translateor of a subset of Logo into Java
 
@@ -20,41 +19,21 @@ public class Logo {
   static private File javaFile, htmlFile;   // output files
   static private PrintWriter pw;            // printwriter used for every output
   static private int numIndent = 0;         // size of indentation
-  static private int varCounter = 0;
-  static private HashMap<String, String> variables = new HashMap();
-  static private Stack<String> repcounts = new Stack();
+  static private int varCounter = 0;        // used to create unique identifiers
+  static private Stack<String> repcounts = new Stack(); // Contains a stack of iteration variables (used in REPEAT statements)
 
-
-  public static String getIdentifier(String name) {
-    if(variables.containsKey(name)) return variables.get(name);
-    else {
-        String variable = getIdentifier();
-        variables.put(name, variable);
-        return variable;
-    }
-  }
-
-  public static void removeIdentifier(String name) {
-    variables.remove(name);
-  }
-
-
-  public static String getFunctionIdentifier(String name) {
-    return getIdentifier("f_" + name);
-  }
-
-  public static String getParamIdentifier(String name) {
-    return getIdentifier("p_" + name);
-  }
-
-  public static String getIdentifier() {
+  /**
+   * Gets a unique identifier.
+   * @return a unique identifier.
+   */
+  private static String getIdentifier() {
     return "i" + (varCounter++);
   }
 
   // to pretty-print the translation
   // uses numIndent and pw defined as static variables in LogoParser
   // writes in pw the numIndent times the indent string
-  public static void indent() {
+  private static void indent() {
     for (int i=0; i<numIndent; i++) { pw.print("   "); }
   }
 
@@ -112,6 +91,14 @@ TOKEN: { <PARAMETER: <PARSEP> <IDENTIFIER> > // removes parameter separator
 //          { matchedToken.image=image.substring(1,image.length()); }
 }
 
+
+
+//////////////////////////////////////////////////////////////
+//
+//  S E T U P
+//
+/////////////////////////////////////////////////////////////
+
 void start() throws IOException:
 { Token t; }
 {
@@ -166,288 +153,334 @@ void start() throws IOException:
 
 void subroutine():
 {
-    Token t;
-    int paramCount = 0;
+  Token t;
+  int paramCount = 0; // used to keep count
 }
 {
-    <SUBROUTINE> t=<IDENTIFIER> {
-        indent();
-        pw.print("void " + getIdentifier(t.image) + "(");
+  <SUBROUTINE> t=<IDENTIFIER> {
+    // Start method definition of the user routine
+    // -- FUNCTION SIGNATURE --
+    indent();
+    pw.print("void " + t.image + "(");
+  }
+  (
+    t=<PARAMETER>{
+      // Append argument (preceding comma only _after_ first one)
+      if(paramCount++ > 0) pw.print(", ");
+      // We could just use substring here, but this way we can discern between function/argument
+      pw.print("double " + t.image.replace(":", "_") );
     }
-    (
-        t=<PARAMETER>{
-            if(paramCount++ > 0)
-                pw.print(", ");
-            pw.print("double " + getIdentifier(t.image) );
-        }
-    )*
-    {
-        numIndent++;
-        pw.println(") {");
-    }
-    (statement() )*
-    {
-        numIndent--;
-        indent();
-        pw.println("}");
-    }<END>
+  )*
+  {
+    numIndent++;
+    pw.println(") {");
+    // -- /FUNCTION SIGNATURE --
+    // -- FUNCTION BODY --
+  }
+  (statement() )*
+  {
+    numIndent--;
+    indent();
+    pw.println("}");
+    // -- / FUNCTION BODY ---
+  }<END>
 }
 
 void statement():
 {}
 {
-  simpleFunction() |
-  parameterizedFunction() |
-  waitFn() |
+  simpleFunction() | // Functions that take no arguments
+  parameterizedFunction() | // Functions with one argument
+  waitFn() | // The wait function is somewhat special because it requires an integer
   userRoutine() |
   repeat() |
-  ifonlyOp() |
-  ifelseOp()
+  ifonlyOp() | // "If" operation _without_ "else"
+  ifelseOp() // "IF-Else" operation
 }
 
-void ifonlyOp():
-{
-}
-{
+
+
+//////////////////////////////////////////////////////////////
+//
+//  S T A T E M E N T S   (print themselves out)
+//
+/////////////////////////////////////////////////////////////
+
+  void ifonlyOp():
+  {
+  }
+  {
+    // We "forward" the actual definition to a sub rule
     <IF> ifOp()
-}
+  }
 
-void ifelseOp():
-{
-}
-{
+  void ifelseOp():
+  {
+  }
+  {
     <IFELSE> ifOp()
     {
-        indent(); numIndent++;
-        pw.println("else {");
+      // ifOp has taken care of the if part, leaving us with if(...) { }
+      // -> that's where we start:
+      indent(); numIndent++;
+      pw.println("else {");
     }
     <LBRA> ( statement() )* <RBRA>
     {
-        numIndent--; indent();
-        pw.println("}");
+      numIndent--; indent();
+      pw.println("}");
     }
-}
-
-void ifOp():
-{
-    String condition;
-}
-{
-  condition=bexpr()
-  {
-    indent(); numIndent++;
-    pw.printf("if (%s) {\n", condition );
   }
-  <LBRA> ( statement() )* <RBRA>
-  {
-    numIndent--; indent();
-    pw.println("}");
-  }
-}
 
-void repeat():
-{
-    String e;
-}
-{
+  // Defines how an "If" is composed to prevent redundancy
+  void ifOp():
+  {
+      String condition; // String representation of the condition
+  }
+  {
+    condition=bexpr()
+    {
+      indent(); numIndent++;
+      pw.printf("if (%s) {\n", condition );
+    }
+    <LBRA> ( statement() )* <RBRA>
+    {
+      numIndent--; indent();
+      pw.println("}");
+    }
+  }
+
+  // The repeat function makes use of a stack to keep track of the current "iteration" variable.
+  // Why? Because it's a perfect fit.
+  void repeat():
+  {
+    String e; // Expression that defines the number of times
+  }
+  {
     <REPEAT> e=nexpr()
     {
-        String i = getIdentifier();
-        repcounts.push(i);
-        indent(); numIndent++;
-        pw.printf("for (int %s = 0; %1$s < (int)(%s); %1$s++){\n", i, e);
+      // Get a unique identifier (i) and push it on the stack
+      String i = getIdentifier();
+      repcounts.push(i);
+      indent(); numIndent++;
+      pw.printf("for (int %s = 0; %1$s < (int)(%s); %1$s++){\n", i, e);
     }
     <LBRA> ( statement() )* <RBRA>
     {
-        repcounts.pop();
-        numIndent--; indent();
-        pw.println("}");
+      // We're done, so pop the identifier off the stack.
+      repcounts.pop();
+      numIndent--; indent();
+      pw.println("}");
     }
-}
+  }
 
-void simpleFunction():
-{
-    Token t;
-}
-{
+  // Collective rule for parameterless functions
+  void simpleFunction():
+  {
+    Token t; // Token
+  }
+  {
     (t=<CLEARSCREEN>| t=<PENDOWN>| t=<PENUP>|t=<HIDETURTLE>|t=<SHOWTURTLE>)
     {
-        indent();
-        pw.printf("logo.%s();\n", t.image.toLowerCase());
+      indent();
+      pw.printf("logo.%s();\n", t.image.toLowerCase());
     }
-}
+  }
 
-void parameterizedFunction():
-{
-    Token t;
-    String p;
-}
-{
-    (t=<FORWARD>|t=<BACKWARD>|t=<LEFTTURN>|t=<RIGHTTURN>) p=nexpr()
+  // Collective rule for functions with a parameter
+  void parameterizedFunction():
+  {
+    Token t;  // Token
+    String arg;  // Parameter
+  }
+  {
+    (t=<FORWARD>|t=<BACKWARD>|t=<LEFTTURN>|t=<RIGHTTURN>) arg=nexpr()
     {
-        indent();
-        pw.printf("logo.%s(%s);\n", t.image.toLowerCase(), p);
+      indent();
+      pw.printf("logo.%s(%s);\n", t.image.toLowerCase(), arg);
     }
-}
+  }
 
-void waitFn():
-{
-    Token t;
-    String p;
-}
-{
- t=<WAIT> p=nexpr()
+  // Rule for the wait functions. Requires an integer for its parameter.
+  void waitFn():
+  {
+    Token t; // Token
+    String arg; // Parameter
+  }
+  {
+   t=<WAIT> arg=nexpr()
     {
-        indent();
-        pw.printf("logo.%s((int)(%s));\n", t.image.toLowerCase(), p);
+      indent();
+      pw.printf("logo.%s((int)(%s));\n", t.image.toLowerCase(), arg);
     }
-}
+  }
 
-void userRoutine():
-{
+  // Rule for invocations of user routines
+  void userRoutine():
+  {
     Token t;
     String param;
-  int paramCount = 0;
-}
-{
+    int paramCount = 0;
+  }
+  {
+    // Handle signature...
     t=<IDENTIFIER>
     {
-        indent();
-        pw.printf("this.%s(", getIdentifier(t.image));
+      indent();
+      pw.printf("this.%s(", t.image);
     }
+
+    // Handle params...
     (
-        param=nexpr()
-        {
-            if(paramCount++ > 0)
-                pw.print(", ");
-            pw.print( param );
-        }
+      param=nexpr()
+      {
+        if(paramCount++ > 0)
+          pw.print(", ");
+        pw.print( param );
+      }
     )*
+
+    // Close...
     {
-        pw.println(");");
+      pw.println(");");
     }
-}
+  }
 
 
-String nexpr():
-{
+//////////////////////////////////////////////////////////////
+//
+//  T E R M S (return a string)
+//
+/////////////////////////////////////////////////////////////
+
+  // Numeric expression
+  String nexpr():
+  {
     String expression;
     String t2;
     Token op;
-}
-{
+  }
+  {
     expression = nterm()
     {
-        expression = "(" + expression + ")";
+      expression = "(" + expression + ")";
     }
     (
-        (op=<ADD>|op=<SUB>) t2 = nterm()
-        {
-            expression += op.image + "(" + t2 + ")";
-        }
+      (op=<ADD>|op=<SUB>) t2 = nterm()
+      {
+        expression += op.image + "(" + t2 + ")";
+      }
     )*
     {
-        return expression;
+      return expression;
     }
-}
+  }
 
-String nterm():
-{
+  // Numeric term
+  String nterm():
+  {
     String expression = "";
     String factor;
     Token t;
-}
-{
+  }
+  {
     expression = nfactor()
     {
-        expression = "(" + expression + ")";
+      expression = "(" + expression + ")";
     }
     (
-        (t=<MUL>|t=<DIV>) factor=nfactor()
-        {
-            expression += t.image + "(" + factor + ")";
-        }
+      (t=<MUL>|t=<DIV>) factor=nfactor()
+      {
+        expression += t.image + "(" + factor + ")";
+      }
     )*
     {
-        return expression;
+      return expression;
     }
-}
+  }
 
-String nfactor():
-{
+  // Numeric factor
+  String nfactor():
+  {
     Token t = null;
     String expr = "";
-}
-{
-    // Not implementable because of cases like "MYROUTINE 1 -1"
-    //(<SUB>)?
-    (t=<NUM> | <REPCOUNT> { expr = repcounts.peek(); } | t=<PARAMETER> { expr = getIdentifier(t.image); t = null; }| <LPAR> expr=nexpr() <RPAR>)
+  }
+  {
+    // Will explode and kill puppies if you call "myroutine 1 -1"
+    // Read: it's an ambiguity and can't so easily be resolved with a lookahead (I tried)
+    (<SUB>)?
+    (t=<NUM> | <REPCOUNT> { expr = repcounts.peek(); } | t=<PARAMETER> { expr =  t.image.replace(":", "_"); t = null; }| <LPAR> expr=nexpr() <RPAR>)
     {
-        if(t != null)
-            return t.image;
-        else
-            return "(" + expr + ")";
+      if(t != null)
+        return t.image;
+      else
+        return "(" + expr + ")";
     }
-}
+  }
 
-String bexpr():
-{
+  // Boolean expression
+  String bexpr():
+  {
+    // For left and right. "l" will eventually contain the entire string.
     String l, r;
-}
-{
+  }
+  {
     l = bterm()
     {
-        l = "(" + l + ")";
+      // Start with the left part
+      l = "(" + l + ")";
     }
+    // Join with ORs
     (
-        <OR> r = bterm()
-        {
-            l += " || (" +r+")";
-        }
+      <OR> r = bterm()
+      {
+        l += " || (" +r+")";
+      }
     )*
     {
-        return l;
+      return l;
     }
-}
+  }
 
-String bterm():
-{
+  // Boolean term
+  String bterm():
+  {
+    // For left and right. "l" will eventually contain the entire string.
     String l, r;
-}
-{
+  }
+  {
     l = bfactor()
     {
-        l = "("+l+")";
+      l = "("+l+")";
     }
     (
-        <AND> r = bfactor()
-        {
-            l += " && ("+r+")";
-        }
+      <AND> r = bfactor()
+      {
+        l += " && ("+r+")";
+      }
     )*
     {
-        return l;
+      return l;
     }
-}
+  }
 
-String bfactor():
-{
+
+  // Boolean factor
+  String bfactor():
+  {
     Token t;
     String result;
     String n1, n2;
-}
-{
+  }
+  {
     <TRUE> { return "true"; } |
     <FALSE> { return "false"; } |
     <NOT> <LPAR> result = bexpr() <RPAR>
     {
-       return "!" + result;
+      return "!" + result;
     }|
     n1 = nexpr() ( t=<EQ> | t=<NE> | t=<LT> | t=<GT> | t=<LE> | t=<GE> ) n2 = nexpr()
     {
-        return n1 + t.image + n2;
+      return n1 + t.image + n2;
     }
-}
-
-
-// ADD THE REST OF THE JAVACC RULES WITH THE JAVA CODE
+  }
